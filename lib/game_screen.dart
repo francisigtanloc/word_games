@@ -337,7 +337,7 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Word Puzzle'),
+        title: Text('Game'),
         actions: [
           Center(
             child: Container(
