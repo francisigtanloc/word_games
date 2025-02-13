@@ -7,33 +7,27 @@
 </head>
 <body>
     <h1>Test API</h1>
-    <pre id="output"></pre>
-
-    <script>
-        var data = [
-            {
-                "word": "dog",
-                "category": "animals",
-                "hint": "Man's best friend"
-            },
-            {
-                "word": "house",
-                "category": "places",
-                "hint": "Where you live"
-            },
-            {
-                "word": "apple",
-                "category": "food",
-                "hint": "Healthy snack"
-            },
-            {
-                "word": "car",
-                "category": "vehicles",
-                "hint": "Drive around town"
-            }
-        ];
-
-        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-    </script>
+    <pre>[
+    {
+        "word": "dog",
+        "category": "animal",
+        "hint": "Man's best friend"
+    },
+    {
+        "word": "house",
+        "category": "place",
+        "hint": "Where you live"
+    },
+    {
+        "word": "apple",
+        "category": "food",
+        "hint": "Healthy snack"
+    },
+    {
+        "word": "car",
+        "category": "vehicle",
+        "hint": "Drive around town"
+    }
+]</pre>
 </body>
 </html>
