@@ -14,20 +14,20 @@ class _GameScreenState extends State<GameScreen> {
   String? message;
   bool isCorrect = false;
   bool showHint = false;
-  int totalWords = 0;
+  int unusedWords = 0;
   final TextEditingController _guessController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadNewWord();
-    _loadWordCount();
+    _loadUnusedWordCount();
   }
 
-  Future<void> _loadWordCount() async {
-    final count = await DatabaseHelper.instance.getWordCount();
+  Future<void> _loadUnusedWordCount() async {
+    final count = await DatabaseHelper.instance.getUnusedWordCount();
     setState(() {
-      totalWords = count;
+      unusedWords = count;
     });
   }
 
@@ -50,12 +50,14 @@ class _GameScreenState extends State<GameScreen> {
         showHint = false;
         _guessController.clear();
       });
-      await DatabaseHelper.instance.markWordAsUsed(newWord.word);
     } else {
       setState(() {
-        message = "No more words available!";
+        currentWord = null;
+        shuffledWord = null;
+        message = "You have answered everything, please come back for future updates.";
       });
     }
+    _loadUnusedWordCount();
   }
 
   void _checkAnswer() async {
@@ -63,25 +65,50 @@ class _GameScreenState extends State<GameScreen> {
       setState(() {
         isCorrect = true;
       });
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Correct!'),
-            content: Text('Great job! You got it right!'),
-            actions: <Widget>[
-              TextButton(
-                child: Text('Next Word'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _loadNewWord();
-                },
-              ),
-            ],
-          );
-        },
-      );
+      await DatabaseHelper.instance.markWordAsUsed(currentWord!.word);
+      await _loadUnusedWordCount();
+      
+      if (unusedWords > 0) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Correct!'),
+              content: Text('Great job! You got it right!'),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('Next Word'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _loadNewWord();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Congratulations!'),
+              content: Text('You have completed all available words! Please come back for future updates.'),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('Back to Main Menu'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // Return to main screen
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
     } else {
       setState(() {
         message = "Try again!";
@@ -99,88 +126,71 @@ class _GameScreenState extends State<GameScreen> {
             child: Padding(
               padding: EdgeInsets.only(right: 16.0),
               child: Text(
-                'Words: $totalWords',
+                'Words Left: $unusedWords',
                 style: TextStyle(fontSize: 16),
               ),
             ),
           ),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade100, Colors.blue.shade200],
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: currentWord == null ? Center(
+          child: Text(
+            message ?? '',
+            style: TextStyle(fontSize: 18),
+            textAlign: TextAlign.center,
           ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Text(
-                'Category: ${currentWord?.category ?? ""}',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ) : Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            if (shuffledWord != null) Text(
+              shuffledWord!,
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            if (showHint) Text(
+              'Hint: ${currentWord?.hint}',
+              style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic),
+            ),
+            SizedBox(height: 20),
+            TextField(
+              controller: _guessController,
+              decoration: InputDecoration(
+                labelText: 'Enter your guess',
+                border: OutlineInputBorder(),
               ),
-              SizedBox(height: 20),
-              Text(
-                shuffledWord ?? "",
-                style: TextStyle(fontSize: 36, letterSpacing: 4),
-              ),
-              SizedBox(height: 20),
-              if (showHint)
-                Text(
-                  'Hint: ${currentWord?.hint ?? ""}',
-                  style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
+              enabled: currentWord != null,
+            ),
+            SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: currentWord != null ? _checkAnswer : null,
+                  child: Text('Submit'),
                 ),
-              SizedBox(height: 20),
-              TextField(
-                controller: _guessController,
-                decoration: InputDecoration(
-                  labelText: 'Enter your guess',
-                  border: OutlineInputBorder(),
-                  filled: true,
-                  fillColor: Colors.white,
+                ElevatedButton(
+                  onPressed: currentWord != null ? () {
+                    setState(() {
+                      showHint = true;
+                    });
+                  } : null,
+                  child: Text('Show Hint'),
+                ),
+              ],
+            ),
+            if (message != null) Padding(
+              padding: EdgeInsets.only(top: 20),
+              child: Text(
+                message!,
+                style: TextStyle(
+                  color: isCorrect ? Colors.green : Colors.red,
+                  fontSize: 16,
                 ),
               ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        showHint = true;
-                      });
-                    },
-                    child: Text('Show Hint'),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: _checkAnswer,
-                    child: Text('Submit'),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                    ),
-                  ),
-                ],
-              ),
-              if (message != null)
-                Padding(
-                  padding: EdgeInsets.only(top: 20),
-                  child: Text(
-                    message!,
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: message == "Try again!" ? Colors.red : Colors.green,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -97,7 +97,7 @@ class DatabaseHelper {
       table,
       {'used': 1},
       where: 'word = ?',
-      whereArgs: [word]
+      whereArgs: [word],
     );
   }
 
@@ -108,6 +108,12 @@ class DatabaseHelper {
       {'used': 0},
       where: '1 = 1'  // Updates all rows
     );
+  }
+
+  Future<int> getUnusedWordCount() async {
+    Database db = await instance.database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM $table WHERE used = 0');
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> getWordCount() async {
