@@ -1,9 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="word_games"
         android:name="${applicationName}"
+        android:label="word_games"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9316751746869318~4486495796"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
