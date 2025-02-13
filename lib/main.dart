@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart' as dom;
+import 'dart:convert';
 import 'database_helper.dart';
 import 'word.dart';
-import 'dart:convert';
-import 'package:flutter/services.dart';
+import 'game_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,6 +29,49 @@ class MyApp extends StatelessWidget {
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+
+  Future<void> _fetchDataAndNavigate(BuildContext context) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
+
+    try {
+      await fetchDataAndStore();
+      // Pop the loading dialog
+      Navigator.pop(context);
+      // Navigate to game screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GameScreen()),
+      );
+    } catch (e) {
+      // Pop the loading dialog
+      Navigator.pop(context);
+      // Show error dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to fetch data: $e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,9 +106,7 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 50),
               _buildButton(
                 text: 'Play',
-                onPressed: () {
-                  // TODO: Implement play functionality
-                },
+                onPressed: () => _fetchDataAndNavigate(context),
               ),
               const SizedBox(height: 20),
               _buildButton(
@@ -118,33 +159,44 @@ class HomePage extends StatelessWidget {
 }
 
 Future<void> fetchDataAndStore() async {
-  final url = Uri.parse('https://francisigtanloc.github.io/word_games/');
-  final response = await http.get(url);
+  try {
+    final url = Uri.parse('https://francisigtanloc.github.io/word_games/');
+    final response = await http.get(url);
 
-  if (response.statusCode == 200) {
-    var document = parser.parse(response.body);
-    dom.Element? preElement = document.querySelector('pre');
-    if (preElement != null) {
-      String jsonString = preElement.text;
-      // Remove any leading/trailing whitespace or newlines
-      jsonString = jsonString.trim();
+    if (response.statusCode == 200) {
+      var document = parser.parse(response.body);
+      var preElement = document.querySelector('pre');
+      
+      if (preElement != null) {
+        String jsonString = preElement.text.trim();
+        
+        try {
+          List<dynamic> data = jsonDecode(jsonString);
+          
+          // Clear existing data
+          await DatabaseHelper.instance.clearTable();
 
-      // Decode the JSON string
-      List<dynamic> data = jsonDecode(jsonString);
-
-      // Store the data in the database
-      for (var item in data) {
-        Word word = Word(
-          word: item['word'],
-          category: item['category'],
-          hint: item['hint'],
-        );
-        await DatabaseHelper.instance.insert(word);
+          // Insert new data
+          for (var item in data) {
+            Word word = Word(
+              word: item['word'],
+              category: item['category'],
+              hint: item['hint'],
+            );
+            await DatabaseHelper.instance.insert(word);
+          }
+        } catch (e) {
+          print('JSON decode error: $e');
+          throw Exception('Failed to parse JSON data: $e');
+        }
+      } else {
+        throw Exception('Could not find data element in the response');
       }
     } else {
-      print('Could not find <pre> element');
+      throw Exception('Failed to fetch data: ${response.statusCode}');
     }
-  } else {
-    print('Failed to fetch data: ${response.statusCode}');
+  } catch (e) {
+    print('Error in fetchDataAndStore: $e');
+    throw Exception('Error fetching or storing data: $e');
   }
 }
