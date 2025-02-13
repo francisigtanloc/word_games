@@ -51,6 +51,37 @@ class DatabaseHelper {
     await db.delete(table);
   }
 
+  Future<bool> wordExists(String word) async {
+    Database db = await instance.database;
+    final List<Map<String, dynamic>> result = await db.query(
+      table,
+      where: 'word = ?',
+      whereArgs: [word],
+    );
+    return result.isNotEmpty;
+  }
+
+  Future<void> insertWordIfNotExists(Word word) async {
+    if (!await wordExists(word.word)) {
+      await insertWord(word);
+    }
+  }
+
+  Future<void> insertWord(Word word) async {
+    Database db = await instance.database;
+    await db.insert(
+      table,
+      word.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<void> insertWords(List<Word> words) async {
+    for (var word in words) {
+      await insertWordIfNotExists(word);
+    }
+  }
+
   Future<int> insert(Word word) async {
     Database db = await instance.database;
     return await db.insert(

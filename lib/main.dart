@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:html/parser.dart' as parser;
 import 'dart:convert';
 import 'database_helper.dart';
 import 'word.dart';
@@ -31,26 +30,61 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   Future<void> _fetchDataAndNavigate(BuildContext context) async {
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
-      },
-    );
-
     try {
-      await fetchDataAndStore();
-      // Pop the loading dialog
-      Navigator.pop(context);
-      // Navigate to game screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => GameScreen()),
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        },
       );
+
+      // Fetch and parse data
+      final url = Uri.parse('https://francisigtanloc.github.io/word_games/');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        var jsonString = response.body;
+        // Find the JSON content between <pre> tags if it exists
+        final preStart = jsonString.indexOf('<pre>');
+        final preEnd = jsonString.indexOf('</pre>');
+        if (preStart != -1 && preEnd != -1) {
+          jsonString = jsonString.substring(preStart + 5, preEnd).trim();
+        }
+
+        try {
+          List<dynamic> data = jsonDecode(jsonString);
+          List<Word> words = [];
+          
+          // Process JSON data
+          for (var item in data) {
+            words.add(Word(
+              word: item['word'],
+              category: item['category'],
+              hint: item['hint'],
+            ));
+          }
+
+          // Insert only new words, preserving existing data
+          await DatabaseHelper.instance.insertWords(words);
+
+          // Pop the loading dialog
+          Navigator.pop(context);
+          // Navigate to game screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => GameScreen()),
+          );
+        } catch (e) {
+          print('JSON parsing error: $e');
+          throw Exception('Failed to parse data format');
+        }
+      } else {
+        throw Exception('Failed to load data from server');
+      }
     } catch (e) {
       // Pop the loading dialog
       Navigator.pop(context);
@@ -59,12 +93,14 @@ class HomePage extends StatelessWidget {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('Error'),
-            content: Text('Failed to fetch data: $e'),
-            actions: [
+            title: Text('Error'),
+            content: Text('Failed to fetch data. Please check your internet connection and try again.'),
+            actions: <Widget>[
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                child: Text('OK'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
               ),
             ],
           );
@@ -155,48 +191,5 @@ class HomePage extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-Future<void> fetchDataAndStore() async {
-  try {
-    final url = Uri.parse('https://francisigtanloc.github.io/word_games/');
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      var document = parser.parse(response.body);
-      var preElement = document.querySelector('pre');
-      
-      if (preElement != null) {
-        String jsonString = preElement.text.trim();
-        
-        try {
-          List<dynamic> data = jsonDecode(jsonString);
-          
-          // Clear existing data
-          await DatabaseHelper.instance.clearTable();
-
-          // Insert new data
-          for (var item in data) {
-            Word word = Word(
-              word: item['word'],
-              category: item['category'],
-              hint: item['hint'],
-            );
-            await DatabaseHelper.instance.insert(word);
-          }
-        } catch (e) {
-          print('JSON decode error: $e');
-          throw Exception('Failed to parse JSON data: $e');
-        }
-      } else {
-        throw Exception('Could not find data element in the response');
-      }
-    } else {
-      throw Exception('Failed to fetch data: ${response.statusCode}');
-    }
-  } catch (e) {
-    print('Error in fetchDataAndStore: $e');
-    throw Exception('Error fetching or storing data: $e');
   }
 }

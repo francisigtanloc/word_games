@@ -32,10 +32,10 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   String _shuffleWord(String word) {
-    List<String> characters = word.split('');
+    List<String> characters = word.toUpperCase().split('');
     do {
       characters.shuffle();
-    } while (characters.join() == word);
+    } while (characters.join() == word.toUpperCase());
     return characters.join();
   }
 
@@ -144,9 +144,22 @@ class _GameScreenState extends State<GameScreen> {
         ) : Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            if (currentWord != null) Text(
+              'Guess the ${currentWord!.category}',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                color: Colors.blue[700],
+              ),
+            ),
+            SizedBox(height: 16),
             if (shuffledWord != null) Text(
               shuffledWord!,
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 32, 
+                fontWeight: FontWeight.bold,
+                letterSpacing: 8.0,
+              ),
             ),
             SizedBox(height: 20),
             if (showHint) Text(
