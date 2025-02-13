@@ -4,8 +4,9 @@ import 'word.dart';
 
 class DatabaseHelper {
   static const _databaseName = "WordsDB.db";
-  static const _databaseVersion = 2;  // Increment version to trigger database upgrade
+  static const _databaseVersion = 3;  // Increment version for new table
   static const table = 'words';
+  static const userTable = 'user_data';
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
@@ -36,6 +37,21 @@ class DatabaseHelper {
         used INTEGER NOT NULL DEFAULT 0
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE $userTable (
+        id INTEGER PRIMARY KEY,
+        can_shuffle INTEGER NOT NULL DEFAULT 1,
+        can_hint INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+
+    // Insert initial user data
+    await db.insert(userTable, {
+      'id': 1,
+      'can_shuffle': 1,
+      'can_hint': 1,
+    });
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -43,6 +59,22 @@ class DatabaseHelper {
       // Drop the old table and create a new one
       await db.execute('DROP TABLE IF EXISTS $table');
       await _onCreate(db, newVersion);
+    } else if (oldVersion < 3) {
+      // Create user_data table if upgrading from older version
+      await db.execute('''
+        CREATE TABLE $userTable (
+          id INTEGER PRIMARY KEY,
+          can_shuffle INTEGER NOT NULL DEFAULT 1,
+          can_hint INTEGER NOT NULL DEFAULT 1
+        )
+      ''');
+
+      // Insert initial user data
+      await db.insert(userTable, {
+        'id': 1,
+        'can_shuffle': 1,
+        'can_hint': 1,
+      });
     }
   }
 
@@ -151,5 +183,66 @@ class DatabaseHelper {
     Database db = await instance.database;
     final result = await db.rawQuery('SELECT COUNT(*) as count FROM $table');
     return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // User data methods
+  Future<bool> canUseHint() async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> result = await db.query(
+      userTable,
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+    return result.first['can_hint'] == 1;
+  }
+
+  Future<bool> canUseShuffle() async {
+    Database db = await instance.database;
+    List<Map<String, dynamic>> result = await db.query(
+      userTable,
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+    return result.first['can_shuffle'] == 1;
+  }
+
+  Future<void> useHint() async {
+    Database db = await instance.database;
+    await db.update(
+      userTable,
+      {'can_hint': 0},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  Future<void> useShuffle() async {
+    Database db = await instance.database;
+    await db.update(
+      userTable,
+      {'can_shuffle': 0},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  Future<void> resetHint() async {
+    Database db = await instance.database;
+    await db.update(
+      userTable,
+      {'can_hint': 1},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  Future<void> resetShuffle() async {
+    Database db = await instance.database;
+    await db.update(
+      userTable,
+      {'can_shuffle': 1},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
   }
 }
